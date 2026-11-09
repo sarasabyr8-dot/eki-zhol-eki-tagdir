@@ -160,7 +160,7 @@ document.getElementById('next').onclick=()=>location.reload();
 };
 function animate(){
 requestAnimationFrame(animate);
-camera.position.z+=(path?12:22-camera.position.z)*.012;
+camera.position.z += ((path ? 12 : 22) - camera.position.z) * 0.012;
 camera.position.y=7+Math.sin(Date.now()*.0005)*.3;
 camera.lookAt(0,2,-12);
 lamp.intensity=85+Math.sin(Date.now()*.002)*15;
