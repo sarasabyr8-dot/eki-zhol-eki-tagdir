@@ -1,0 +1,166 @@
+
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Екі жол – екі тағдыр</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#050914;color:white;font-family:Arial;overflow:hidden}
+canvas{position:fixed;inset:0}
+#ui{position:fixed;inset:0;display:flex;flex-direction:column;
+justify-content:center;align-items:center;text-align:center;padding:20px;
+background:linear-gradient(transparent,#03071288)}
+h1{font-size:clamp(30px,7vw,54px);text-shadow:0 0 25px #42caff}
+p{font-size:18px;max-width:650px;line-height:1.6}
+button{padding:15px 22px;margin:8px;border-radius:12px;
+border:1px solid white;background:#152a43;color:white;font-size:16px}
+.red{background:#80172b}.green{background:#08744b}
+#next{display:none}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+</head>
+<body>
+<div id="ui">
+<h1 id="title">ЕКІ ЖОЛ – ЕКІ ТАҒДЫР</h1>
+<p id="desc">Өміріңдегі ең маңызды таңдау. Қай жолды таңдайсың?</p>
+<div id="choices" style="display:none">
+<button class="red" onclick="selectPath('bad')">🔴 НАШАҚОРЛЫҚ</button>
+<button class="green" onclick="selectPath('good')">🟢 ЖАРҚЫН БОЛАШАҚ</button>
+</div>
+<button id="start" onclick="begin()">БАСТАУ ▶</button>
+<button id="next" onclick="advance()">КЕЛЕСІ КӨРІНІС →</button>
+</div>
+<script type="module">
+import * as THREE from 'three';
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x071020);
+scene.fog=new THREE.FogExp2(0x071020,.018);
+
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,300);
+camera.position.set(0,7,22);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x24334d,2));
+const lamp=new THREE.PointLight(0x55aaff,90,100);
+lamp.position.set(0,15,0);scene.add(lamp);
+
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(150,150),
+new THREE.MeshStandardMaterial({color:0x101a2c}));
+floor.rotation.x=-Math.PI/2;floor.position.y=-.2;scene.add(floor);
+
+let sceneObjects=[],step=0,path='',audio=null;
+const stories={
+bad:[
+['Алғашқы қадам','Қызығушылықпен басталған қауіпті таңдау.'],
+['Тәуелділік','Есірткі адам өмірін біртіндеп бақылауға алады.'],
+['Денсаулық','Ағза әлсірейді. Денсаулыққа ауыр зиян келеді.'],
+['Жалғыздық','Жақындарыңның сенімін жоғалту.'],
+['Түрме','Қылмыс пен бостандықтан айырылу.'],
+['Өкініш','Армандар орындалмай, өмір қараңғылыққа айналады.']
+],
+good:[
+['Дұрыс таңдау','Нашақорлықтан бас тарту – өз болашағыңды қорғау.'],
+['Денсаулық','Спорт, күш, салауатты өмір.'],
+['Табыс','Білім, еңбек және табысты бизнес.'],
+['Армандағы үй','Әдемі үй, жеке көлік, жайлы өмір.'],
+['Отбасы','Бақытты отбасы және ата-ананың қуанышы.'],
+['Саяхат','Шетел аралау, жаңа елдер мен мүмкіндіктер.']
+]
+};
+
+function clear(){
+sceneObjects.forEach(o=>scene.remove(o));
+sceneObjects=[];
+}
+function addBox(x,y,z,w,h,d,color){
+let m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+new THREE.MeshStandardMaterial({color,roughness:.55}));
+m.position.set(x,y,z);scene.add(m);sceneObjects.push(m);
+}
+function makeWorld(type){
+clear();
+let good=type==='good';
+scene.background=new THREE.Color(good?0x75bde9:0x100711);
+scene.fog.color.set(good?0x9ccde9:0x190610);
+for(let i=0;i<24;i++){
+let x=(Math.random()-.5)*45,z=-Math.random()*50;
+let h=3+Math.random()*12;
+addBox(x,h/2,z,3,h,3,good?0x416b82:0x28111c);
+}
+addBox(0,.05,-15,good?18:12,.15,55,good?0x348c5d:0x6d1830);
+if(good){
+addBox(-7,3,-10,8,6,7,0xf1dfc0);
+addBox(-7,7,-10,10,2,9,0x994b39);
+addBox(7,5,-20,8,10,8,0x2771a2);
+addBox(0,1,-4,5,1.5,2.5,0xe9c42c);
+}else{
+addBox(0,2,-12,5,4,3,0x35202b);
+addBox(-7,3,-17,3,6,3,0x26111b);
+addBox(7,3,-17,3,6,3,0x26111b);
+}
+}
+function text(title,desc){
+document.getElementById('title').textContent=title;
+document.getElementById('desc').textContent=desc;
+}
+window.begin=()=>{
+document.getElementById('start').style.display='none';
+if(!audio){
+audio=new AudioContext();
+let o=audio.createOscillator(),g=audio.createGain();
+o.type='sine';o.frequency.value=65;g.gain.value=.035;
+o.connect(g);g.connect(audio.destination);o.start();
+}
+text('ҚАЙ ЖОЛДЫ ТАҢДАЙСЫҢ?','Екі жолдың бірін бас. Сенің таңдауың – сенің болашағың.');
+document.getElementById('choices').style.display='block';
+makeWorld('bad');
+};
+window.selectPath=(type)=>{
+path=type;step=0;
+document.getElementById('choices').style.display='none';
+document.getElementById('next').style.display='inline-block';
+show();
+};
+function show(){
+let item=stories[path][step];
+makeWorld(path==='good'?'good':'bad');
+text((step+1)+'. '+item[0],item[1]);
+}
+window.advance=()=>{
+step++;
+if(step<6){show();return;}
+document.getElementById('next').style.display='none';
+makeWorld('good');
+text('ӨЗ ТАҢДАУЫҢ – ӨЗ ҚОЛЫҢДА!',
+'Нашақорлыққа жол жоқ! Болашағыңды бүгін таңда!');
+document.getElementById('next').textContent='ҚАЙТА БАСТАУ';
+document.getElementById('next').style.display='inline-block';
+document.getElementById('next').onclick=()=>location.reload();
+};
+function animate(){
+requestAnimationFrame(animate);
+camera.position.z+=(path?12:22-camera.position.z)*.012;
+camera.position.y=7+Math.sin(Date.now()*.0005)*.3;
+camera.lookAt(0,2,-12);
+lamp.intensity=85+Math.sin(Date.now()*.002)*15;
+renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
